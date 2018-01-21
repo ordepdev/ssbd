@@ -135,6 +135,31 @@ Spark default is memory only, cache().
 arises from unknowingly re-evaluating several transformations when caching
 could be used!
 
+## Cluster Topology
+
+* Master(Driver Program -> Spark Context) ~ This is the node we're interacting with when we're writing Spark programs!
+* Workers(Worker Node -> Executor) ~ These are the nodes actually executing the jobs!
+
+Master and Worker communicate via a *Cluster Manager*, that allocates resources across the cluster and manages scheduling.
+
+If we take a look at the example below:
+
+```scala
+val people: RDD[Person] = ...
+people.foreach(println)
+```
+
+The `foreach` is an `action`, with return type `Unit`. It's `lazy` on the Driver.
+Although, it is `eagerly` executed on the Executors!
+
+
+## Summary
+
+It's crucial to have an understanding how Spark works under the hood in order
+to make effective use of RDDs. It's not always immediately obvious upon first
+glance on what part of the cluster a line of code might run on. We need to know
+by ourselves where the code is running!
+
 ## Resources
 
 * https://jaceklaskowski.gitbooks.io/mastering-apache-spark/
