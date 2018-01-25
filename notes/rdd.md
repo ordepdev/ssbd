@@ -153,6 +153,40 @@ The `foreach` is an `action`, with return type `Unit`. It's `lazy` on the Driver
 Although, it is `eagerly` executed on the Executors!
 
 
+## Distributed Key-Value Pairs -> Pair RDDs
+
+Large datasets are often made up of unfathomably large numbers of complex, nested
+data records. To be able to work with such datasets, it's often desirable to project
+down these complex datatypes into key-value pairs.
+
+It's useful to organize data into key-value pairs since it allows to act on each
+key in parallel or regroup data across the network.
+
+```scala
+val rdd: RDD[WikipediaPage] = ...
+// The following map produce a type RDD[(String, String)]
+val pairRdd = rdd.map(page => (page.title, page.text))
+```
+
+```scala
+def groupBy[K](f: A => K): Map[K, Traversable[A]]
+def groupByKey(): RDD[(K, Iterable[V])]
+def reduceByKey(f: (V, V) => V): RDD[(K, V)] 
+def mapValues[U](f: V => U): RDD[(K, U)]
+def countByKey(): Map[K, Long]
+```
+
+Example where we calculate the average budget per event organizer using
+both `reduceByKey` and `mapValues`:
+```scala
+val avgBudgets = events.mapValues(b => (b, 1))
+                       .reduceByKey((v1, v2) => v1._1 + v2._1, v1._2 + v2._2)
+                       .mapValues {
+                         case (budget, numberOfEvents) => budget / numberOfEvents
+                       }
+                       .collect()
+```
+
 ## Summary
 
 It's crucial to have an understanding how Spark works under the hood in order
