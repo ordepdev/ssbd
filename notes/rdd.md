@@ -37,7 +37,7 @@ Spark = Memory + Network; => 100x faster.
 
 *Spark <3 Data Science*
 * Lazy Transformations;
-* Eagter Actions that kick off staged transformations;
+* Eager Actions that kick off staged transformations;
 * In-memory computations = lower latencies;
 * No need to read/write to disk!
 
@@ -180,12 +180,90 @@ Example where we calculate the average budget per event organizer using
 both `reduceByKey` and `mapValues`:
 ```scala
 val avgBudgets = events.mapValues(b => (b, 1))
-                       .reduceByKey((v1, v2) => v1._1 + v2._1, v1._2 + v2._2)
-                       .mapValues {
-                         case (budget, numberOfEvents) => budget / numberOfEvents
-                       }
-                       .collect()
+	.reduceByKey((v1, v2) => v1._1 + v2._1, v1._2 + v2._2)
+	.mapValues {
+		case (budget, numberOfEvents) => budget / numberOfEvents
+	}
+	.collect()
 ```
+
+`reduceByKey` is more efficient that using each `groupByKey` and
+`reduce` separately.
+
+## Joins
+
+Joins are another sort of transformation on Pair RDDs. They're used
+to combine multiple datasets. There are two kinds of joins: `inner`
+and `outer` joins.
+
+`Inner joins` return a new RDD containing combined pairs whose **keys
+are present in both input RDDs**. Other keys will be dropped from the
+result.
+
+```scala
+def join[W](other RDD[(K,W)]): RDD[(K, (V,W))]
+```
+
+`Outer joins` return a new RDD containing combined pairs whose keys
+don't have to be present in both input RDDs. With `outer joins`, we
+can decide which RDD's keys are most essential to keep the left, or
+the right RDD in the join expression.
+
+```scala
+def leftOuterJoin[W](other: RDD[(K,W)]): RDD[(K, (V,Option[W])]
+def rightOuterJoin[W](other: RDD[(K,W)]): RDD[(K, (Option[V],W)]
+```
+
+## Shuffling
+
+Suffling is when we have to move data from one node to another to
+be "grouped with" its key. These shuffles can be an enormous hit
+because it means that Spark must send data from one node to another.
+
+```scala
+purchases.map(p => (p.customerId, p.price))
+         .groupByKey()
+         .map(p => (p._1, (p._2.size, p._2.sum)))
+         .count()
+```
+
+By reducing the dataset first, the amount of data sent over the
+network during the shuffle is greatly reduced. This kind of trick
+can result in non-trivial gains in performance!
+
+```scala
+purchases.map(p => (p.customerId, (1, p.price))
+         .reduceByKey((v1, v2) => (v1._1 + v2._1, v1._2 + v2._2))
+         .count()
+```
+
+Grouping all values of key-value pairs with the same key requires
+collecting all key-value pairs with the same key on the same machine.
+For determining which key-value pair should be sent to which machine,
+Spark uses *hash partitioning*.
+
+## Partitions
+
+The data within an RDD is split into several *partitions*. There are
+two kinds of available partitioning in Spark: Hash and Range partitioning.
+
+**Properties of partitions:**
+* Partitions never span multiple machines;
+* Each machine in the cluster contains one or more partitions;
+* The number of partitions is configurable. (by default it equals
+the total number of cores on all executor nodes)
+
+### Hash Partitioning
+
+Given a Pair RDD that should be grouped, `groupByKey` first computes
+per tuple `(k,v)` its partition `p`:
+
+```scala
+p = k.hashCode() % numPartitions
+```
+
+Then, all tuples in the same partition `p` are sent to the machine
+hosting `p`.
 
 ## Summary
 
